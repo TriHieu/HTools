@@ -1,4 +1,11 @@
+
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter/return_code.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,21 +20,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
@@ -38,16 +30,6 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -55,71 +37,296 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  final _outputFolderController = TextEditingController();
+  final _dialogTitleController = TextEditingController();
+  final _initialDirectoryController = TextEditingController();
+  String? _fileName;
+  List<PlatformFile>? _paths;
+  List<String?>? _pathString;
+  String? _extension;
+  bool _isLoading = false;
+  bool _lockParentWindow = false;
+  bool _multiPick = false;
+  FileType _pickingType = FileType.any;
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    return MaterialApp(
+      scaffoldMessengerKey: _scaffoldMessengerKey,
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: Colors.deepPurple,
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      home: Scaffold(
+        key: _scaffoldKey,
+        appBar: AppBar(
+          title: const Text('File Picker example app'),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.only(left: 5.0, right: 5.0),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(left: 15.0, right: 15.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Configuration',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                SizedBox(
+                  height: 20.0,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
+                  child: Wrap(
+                    spacing: 10.0,
+                    runSpacing: 10.0,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 120,
+                        child: FloatingActionButton.extended(
+                            onPressed: () => _pickFiles(),
+                            label:
+                            Text(_multiPick ? 'Pick files' : 'Pick file'),
+                            icon: const Icon(Icons.description)),
+                      ),
+                    ],
+                  ),
+                ),
+                Wrap(
+                  spacing: 10.0,
+                  runSpacing: 10.0,
+                  children: [
+                    SizedBox(
+                      width: 400,
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Output Folder',
+                        ),
+                        controller: _outputFolderController,
+                        onTap: () => _selectFolder(),
+                      ),
+                    ),
+                  ],
+                ),
+                Divider(),
+                SizedBox(
+                  height: 20.0,
+                ),
+                Text(
+                  'File Picker Result',
+                  textAlign: TextAlign.start,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                Builder(
+                    builder: (BuildContext context) =>
+                    _isLoading
+                        ? Row(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 40.0,
+                              ),
+                              child: const CircularProgressIndicator(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                        : _paths != null
+                        ? Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20.0,
+                      ),
+                      height:
+                      MediaQuery.of(context).size.height *
+                          0.50,
+                      child: Scrollbar(
+                          child: ListView.separated(
+                            itemCount:
+                            _paths != null && _paths!.isNotEmpty
+                                ? _paths!.length
+                                : 1,
+                            itemBuilder:
+                                (BuildContext context, int index) {
+                              final bool isMultiPath =
+                                  _paths != null &&
+                                      _paths!.isNotEmpty;
+                              final String name = 'File $index: ' +
+                                  (isMultiPath
+                                      ? _paths!
+                                      .map((e) => e.name)
+                                      .toList()[index]
+                                      : _fileName ?? '...');
+                              final path = kIsWeb
+                                  ? null
+                                  : _paths!
+                                  .map((e) => e.path)
+                                  .toList()[index]
+                                  .toString();
+
+                              return ListTile(
+                                title: Text(
+                                  name,
+                                ),
+                                subtitle: Text(path ?? ''),
+                              );
+                            },
+                            separatorBuilder:
+                                (BuildContext context, int index) =>
+                            const Divider(),
+                          )),
+                    )
+                        : const SizedBox(),
+                ),
+                SizedBox(
+                  height: 40.0,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
+                  child: Wrap(
+                    spacing: 10.0,
+                    runSpacing: 10.0,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 120,
+                        child: FloatingActionButton.extended(
+                            onPressed: () => _processFile(),
+                            label:
+                            Text('Process'),
+                            icon: const Icon(Icons.description)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  void _resetState() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _fileName = null;
+      _paths = null;
+    });
+  }
+
+  void _pickFiles() async {
+    var permissionResult = await Permission.storage.request();
+    permissionResult = await Permission.manageExternalStorage.request();
+    if (permissionResult.isDenied) openAppSettings();
+
+    permissionResult = await Permission.photos.request();
+    permissionResult = await Permission.videos.request();
+    permissionResult = await Permission.audio.request();
+    _resetState();
+    try {
+      FilePickerResult? result = (await FilePicker.platform.pickFiles(
+        type: _pickingType,
+        allowMultiple: _multiPick,
+        onFileLoading: (FilePickerStatus status) => print(status),
+        allowedExtensions: (_extension?.isNotEmpty ?? false)
+            ? _extension?.replaceAll(' ', '').split(',')
+            : null,
+        dialogTitle: _dialogTitleController.text,
+        initialDirectory: _initialDirectoryController.text,
+        lockParentWindow: _lockParentWindow,
+      ));
+      _paths = result?.files;
+      _pathString = result?.paths;
+    } on PlatformException catch (e) {
+      _logException('Unsupported operation' + e.toString());
+    } catch (e) {
+      _logException(e.toString());
+    }
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _fileName =
+      _paths != null ? _paths!.map((e) => e.name).toString() : '...';
+    });
+  }
+
+  void _selectFolder() async {
+    try {
+      String? path = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: _dialogTitleController.text,
+        initialDirectory: _initialDirectoryController.text,
+        lockParentWindow: _lockParentWindow,
+      );
+      setState(() {
+        _outputFolderController.text = path!;
+      });
+    } on PlatformException catch (e) {
+      _logException('Unsupported operation' + e.toString());
+    } catch (e) {
+      _logException(e.toString());
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _logException(String message) {
+    print(message);
+    _scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+    _scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _processFile() {
+    FFmpegKit.execute('-allowed_extensions ALL -i "${_outputFolderController.text}/${_paths![0]!.name!}" -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}/${_paths![0]!.name!.replaceAll('m3u8', 'mp4')}"')
+        .then((session) async {
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        print("SUCCESS");
+        // SUCCESS
+      } else if (ReturnCode.isCancel(returnCode)) {
+        print("CANCEL");
+        // CANCEL
+      } else {
+        print("ERROR");
+        // ERROR
+      }
+      final output = await session.getOutput();
+
+      // The stack trace if FFmpegKit fails to run a command
+      final failStackTrace = await session.getFailStackTrace();
+
+      // The list of logs generated for this execution
+      final logs = await session.getLogs();
+      logs.forEach((element) {print(element.getMessage());});
+    });
   }
 }
