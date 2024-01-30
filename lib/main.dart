@@ -1,4 +1,6 @@
 
+import 'dart:io';
+
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter/return_code.dart';
 import 'package:file_picker/file_picker.dart';
@@ -40,6 +42,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _outputFolderController = TextEditingController();
+  final _inputURLController = TextEditingController();
   final _dialogTitleController = TextEditingController();
   final _initialDirectoryController = TextEditingController();
   String? _fileName;
@@ -102,6 +105,26 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ],
                   ),
+                ),
+                Wrap(
+                  spacing: 10.0,
+                  runSpacing: 10.0,
+                  children: [
+                    SizedBox(
+                      width: 400,
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Input URL',
+                        ),
+                        controller: _inputURLController,
+                      ),
+                    ),
+                  ],
+                ),
+                Divider(),
+                SizedBox(
+                  height: 20.0,
                 ),
                 Wrap(
                   spacing: 10.0,
@@ -235,13 +258,17 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _pickFiles() async {
-    var permissionResult = await Permission.storage.request();
-    permissionResult = await Permission.manageExternalStorage.request();
-    if (permissionResult.isDenied) openAppSettings();
+    if (kIsWeb) {
 
-    permissionResult = await Permission.photos.request();
-    permissionResult = await Permission.videos.request();
-    permissionResult = await Permission.audio.request();
+    } else if (Platform.isAndroid) {
+      var permissionResult = await Permission.storage.request();
+      permissionResult = await Permission.manageExternalStorage.request();
+      if (permissionResult.isDenied) openAppSettings();
+
+      permissionResult = await Permission.photos.request();
+      permissionResult = await Permission.videos.request();
+      permissionResult = await Permission.audio.request();
+    }
     _resetState();
     try {
       FilePickerResult? result = (await FilePicker.platform.pickFiles(
@@ -305,8 +332,13 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _processFile() {
-    FFmpegKit.execute('-allowed_extensions ALL -i "${_outputFolderController.text}/${_paths![0]!.name!}" -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}/${_paths![0]!.name!.replaceAll('m3u8', 'mp4')}"')
-        .then((session) async {
+    String cmd = '';
+    if (_inputURLController.text.isNotEmpty) {
+      cmd = '-allowed_extensions ALL -i "${_inputURLController.text}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}"/a.mp4';
+    } else {
+      cmd = '-allowed_extensions ALL -i "${_outputFolderController.text}/${_paths![0]!.name!}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}/${_paths![0]!.name!.replaceAll('m3u8', 'mp4')}"';
+    }
+    FFmpegKit.execute(cmd).then((session) async {
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
