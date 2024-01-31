@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:loader_overlay/loader_overlay.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
@@ -66,86 +67,113 @@ class _MyHomePageState extends State<MyHomePage> {
           backgroundColor: Colors.deepPurple,
         ),
       ),
-      home: Scaffold(
-        key: _scaffoldKey,
-        appBar: AppBar(
-          title: const Text('M3U8 to MP4'),
-        ),
-        body: Padding(
-          padding: const EdgeInsets.only(left: 5.0, right: 5.0),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(left: 15.0, right: 15.0),
+      home: LoaderOverlay(
+        useDefaultLoading: false,
+        overlayColor: Colors.black87.withOpacity(0.8),
+        overlayWidgetBuilder: (dynamic? progress) {
+          return Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
-                  child: Wrap(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(
+                  height: 50,
+                ),
+                if (progress != null)
+                  Text(
+                      progress,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontStyle: FontStyle.italic,
+                        fontSize: 20,
+                        color: Colors.deepPurple
+                      )
+                  )
+              ],
+            ),
+          );
+        },
+        child: Scaffold(
+          key: _scaffoldKey,
+          appBar: AppBar(
+            title: const Text('M3U8 to MP4'),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.only(left: 5.0, right: 5.0),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(left: 15.0, right: 15.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
+                    child: Wrap(
+                      spacing: 10.0,
+                      runSpacing: 10.0,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 120,
+                          child: FloatingActionButton.extended(
+                              onPressed: () => _pickFiles(),
+                              label:
+                              Text(_multiPick ? 'Pick files' : 'Pick file'),
+                              icon: const Icon(Icons.description)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Wrap(
                     spacing: 10.0,
                     runSpacing: 10.0,
-                    children: <Widget>[
+                    children: [
                       SizedBox(
-                        width: 120,
-                        child: FloatingActionButton.extended(
-                            onPressed: () => _pickFiles(),
-                            label:
-                            Text(_multiPick ? 'Pick files' : 'Pick file'),
-                            icon: const Icon(Icons.description)),
+                        width: 400,
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Input URL',
+                          ),
+                          controller: _inputURLController,
+                        ),
                       ),
                     ],
                   ),
-                ),
-                Wrap(
-                  spacing: 10.0,
-                  runSpacing: 10.0,
-                  children: [
-                    SizedBox(
-                      width: 400,
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: 'Input URL',
-                        ),
-                        controller: _inputURLController,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                const SizedBox(
-                  height: 20.0,
-                ),
-                Wrap(
-                  spacing: 10.0,
-                  runSpacing: 10.0,
-                  children: [
-                    SizedBox(
-                      width: 400,
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: 'Output Folder',
-                        ),
-                        controller: _outputFolderController,
-                        onTap: () => _selectFolder(),
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                const SizedBox(
-                  height: 20.0,
-                ),
-                const Text(
-                  'File Selected',
-                  textAlign: TextAlign.start,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                  const Divider(),
+                  const SizedBox(
+                    height: 20.0,
                   ),
-                ),
-                Builder(
+                  Wrap(
+                    spacing: 10.0,
+                    runSpacing: 10.0,
+                    children: [
+                      SizedBox(
+                        width: 400,
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Output Folder',
+                          ),
+                          controller: _outputFolderController,
+                          onTap: () => _selectFolder(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  const SizedBox(
+                    height: 20.0,
+                  ),
+                  const Text(
+                    'File Selected',
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                  Builder(
                     builder: (BuildContext context) =>
                     _isLoading
                         ? const Row(
@@ -168,7 +196,10 @@ class _MyHomePageState extends State<MyHomePage> {
                         vertical: 20.0,
                       ),
                       height:
-                      MediaQuery.of(context).size.height *
+                      MediaQuery
+                          .of(context)
+                          .size
+                          .height *
                           0.40,
                       child: Scrollbar(
                           child: ListView.separated(
@@ -178,13 +209,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                 : 1,
                             itemBuilder:
                                 (BuildContext context, int index) {
-                              final bool isMultiPath = _paths != null && _paths!.isNotEmpty;
+                              final bool isMultiPath = _paths != null &&
+                                  _paths!.isNotEmpty;
                               final String name = 'File $index: ${isMultiPath
-                                      ? _paths!.map((e) => e.name).toList()[index]
-                                      : _fileName ?? '...'}';
+                                  ? _paths!.map((e) => e.name).toList()[index]
+                                  : _fileName ?? '...'}';
                               final path = kIsWeb
                                   ? null
-                                  : _paths!.map((e) => e.path).toList()[index].toString();
+                                  : _paths!.map((e) => e.path).toList()[index]
+                                  .toString();
 
                               return ListTile(
                                 title: Text(
@@ -199,28 +232,29 @@ class _MyHomePageState extends State<MyHomePage> {
                           )),
                     )
                         : const SizedBox(),
-                ),
-                const SizedBox(
-                  height: 10.0,
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
-                  child: Wrap(
-                    spacing: 10.0,
-                    runSpacing: 10.0,
-                    children: <Widget>[
-                      SizedBox(
-                        width: 120,
-                        child: FloatingActionButton.extended(
-                            onPressed: () => _processFile(),
-                            label:
-                            const Text('Process'),
-                            icon: const Icon(Icons.description)),
-                      ),
-                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(
+                    height: 10.0,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
+                    child: Wrap(
+                      spacing: 10.0,
+                      runSpacing: 10.0,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 120,
+                          child: FloatingActionButton.extended(
+                              onPressed: () => _processFile(),
+                              label:
+                              const Text('Process'),
+                              icon: const Icon(Icons.settings)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -314,6 +348,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _processFile() async {
+    context.loaderOverlay.show(
+      progress: "Converting to MP4 ..."
+    );
     await updateInputFile();
     String cmd = '';
     if (_inputURLController.text.isNotEmpty) {
@@ -322,26 +359,18 @@ class _MyHomePageState extends State<MyHomePage> {
       cmd = '-y -protocol_whitelist file,http,https,tls,tcp -allowed_extensions ALL -i "${_outputFolderController.text}/${_paths![0]!.name!}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}/${_paths![0]!.name!.replaceAll('m3u8', 'mp4')}"';
     }
     FFmpegKit.execute(cmd).then((session) async {
-      final output = session.getOutput().asStream().forEach((element) {
-        print(element.toString());
-      });
       final returnCode = await session.getReturnCode();
-
+      context.loaderOverlay.hide();
       if (ReturnCode.isSuccess(returnCode)) {
-        print("SUCCESS");
+        _logException("SUCCESS");
         // SUCCESS
       } else if (ReturnCode.isCancel(returnCode)) {
-        print("CANCEL");
+        _logException("CANCEL");
         // CANCEL
       } else {
-        print("ERROR");
+        _logException("ERROR");
         // ERROR
       }
-
-      // The stack trace if FFmpegKit fails to run a command
-      final failStackTrace = await session.getFailStackTrace();
-
-      // The list of logs generated for this execution
       final logs = await session.getLogs();
       for (var element in logs) {
         print(element.getMessage());
