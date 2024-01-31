@@ -62,14 +62,14 @@ class _MyHomePageState extends State<MyHomePage> {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        snackBarTheme: SnackBarThemeData(
+        snackBarTheme: const SnackBarThemeData(
           backgroundColor: Colors.deepPurple,
         ),
       ),
       home: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: const Text('File Picker example app'),
+          title: const Text('M3U8 to MP4'),
         ),
         body: Padding(
           padding: const EdgeInsets.only(left: 5.0, right: 5.0),
@@ -79,16 +79,6 @@ class _MyHomePageState extends State<MyHomePage> {
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  'Configuration',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-                SizedBox(
-                  height: 20.0,
-                ),
                 Padding(
                   padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
                   child: Wrap(
@@ -122,8 +112,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
-                Divider(),
-                SizedBox(
+                const Divider(),
+                const SizedBox(
                   height: 20.0,
                 ),
                 Wrap(
@@ -143,14 +133,14 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
-                Divider(),
-                SizedBox(
+                const Divider(),
+                const SizedBox(
                   height: 20.0,
                 ),
-                Text(
-                  'File Picker Result',
+                const Text(
+                  'File Selected',
                   textAlign: TextAlign.start,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 20,
                   ),
@@ -158,15 +148,15 @@ class _MyHomePageState extends State<MyHomePage> {
                 Builder(
                     builder: (BuildContext context) =>
                     _isLoading
-                        ? Row(
+                        ? const Row(
                       children: [
                         Expanded(
                           child: Center(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
+                              padding: EdgeInsets.symmetric(
                                 vertical: 40.0,
                               ),
-                              child: const CircularProgressIndicator(),
+                              child: CircularProgressIndicator(),
                             ),
                           ),
                         ),
@@ -179,7 +169,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       height:
                       MediaQuery.of(context).size.height *
-                          0.50,
+                          0.40,
                       child: Scrollbar(
                           child: ListView.separated(
                             itemCount:
@@ -188,21 +178,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                 : 1,
                             itemBuilder:
                                 (BuildContext context, int index) {
-                              final bool isMultiPath =
-                                  _paths != null &&
-                                      _paths!.isNotEmpty;
-                              final String name = 'File $index: ' +
-                                  (isMultiPath
-                                      ? _paths!
-                                      .map((e) => e.name)
-                                      .toList()[index]
-                                      : _fileName ?? '...');
+                              final bool isMultiPath = _paths != null && _paths!.isNotEmpty;
+                              final String name = 'File $index: ${isMultiPath
+                                      ? _paths!.map((e) => e.name).toList()[index]
+                                      : _fileName ?? '...'}';
                               final path = kIsWeb
                                   ? null
-                                  : _paths!
-                                  .map((e) => e.path)
-                                  .toList()[index]
-                                  .toString();
+                                  : _paths!.map((e) => e.path).toList()[index].toString();
 
                               return ListTile(
                                 title: Text(
@@ -218,8 +200,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     )
                         : const SizedBox(),
                 ),
-                SizedBox(
-                  height: 40.0,
+                const SizedBox(
+                  height: 10.0,
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 20.0, bottom: 20.0),
@@ -232,7 +214,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         child: FloatingActionButton.extended(
                             onPressed: () => _processFile(),
                             label:
-                            Text('Process'),
+                            const Text('Process'),
                             icon: const Icon(Icons.description)),
                       ),
                     ],
@@ -331,14 +313,18 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void _processFile() {
+  void _processFile() async {
+    await updateInputFile();
     String cmd = '';
     if (_inputURLController.text.isNotEmpty) {
-      cmd = '-allowed_extensions ALL -i "${_inputURLController.text}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}"/a.mp4';
+      cmd = '-y -protocol_whitelist file,http,https,tls,tcp -allowed_extensions ALL -i "${_inputURLController.text}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy "${_outputFolderController.text}"/a.mp4';
     } else {
-      cmd = '-allowed_extensions ALL -i "${_outputFolderController.text}/${_paths![0]!.name!}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}/${_paths![0]!.name!.replaceAll('m3u8', 'mp4')}"';
+      cmd = '-y -protocol_whitelist file,http,https,tls,tcp -allowed_extensions ALL -i "${_outputFolderController.text}/${_paths![0]!.name!}" -acodec copy -bsf:a aac_adtstoasc -vcodec copy -c copy "${_outputFolderController.text}/${_paths![0]!.name!.replaceAll('m3u8', 'mp4')}"';
     }
     FFmpegKit.execute(cmd).then((session) async {
+      final output = session.getOutput().asStream().forEach((element) {
+        print(element.toString());
+      });
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
@@ -351,14 +337,29 @@ class _MyHomePageState extends State<MyHomePage> {
         print("ERROR");
         // ERROR
       }
-      final output = await session.getOutput();
 
       // The stack trace if FFmpegKit fails to run a command
       final failStackTrace = await session.getFailStackTrace();
 
       // The list of logs generated for this execution
       final logs = await session.getLogs();
-      logs.forEach((element) {print(element.getMessage());});
+      for (var element in logs) {
+        print(element.getMessage());
+      }
     });
+  }
+
+  Future<bool> updateInputFile() async {
+    try {
+      final file = File("${_outputFolderController.text}/${_paths![0]!.name!}");
+      // Read the file
+      var contents = await file.readAsString();
+      contents = contents.replaceFirst("#EXTINF:", "#EXT-X-BYTERANGE:100000000@8\n#EXTINF:");
+      file.writeAsString(contents);
+      return true;
+    } catch (e) {
+      // If encountering an error, return 0
+      return false;
+    }
   }
 }
